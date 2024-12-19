@@ -1,3 +1,10 @@
+### Setup
+
+```bash
+pip install -e .
+```
+
+
 # **NOTE**
 
 This is a fork of the original [TvDatafeed](https://github.com/rongardF/tvdatafeed.git) project by StreamAlpha. This fork has live data retrieving feature implemented. 
