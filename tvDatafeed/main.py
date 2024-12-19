@@ -30,10 +30,10 @@ class Interval(enum.Enum):
 
 
 class TvDatafeed:
-    __sign_in_url = 'https://www.tradingview.com/accounts/signin/'
-    __search_url = 'https://symbol-search.tradingview.com/symbol_search/?text={}&hl=1&exchange={}&lang=en&type=&domain=production'
+    __sign_in_url = "https://www.tradingview.com/accounts/signin/"
+    __search_url = "https://symbol-search.tradingview.com/symbol_search/v3/?text={}&hl=1&exchange={}&lang=en&&search_type=undefined&domain=production&sort_by_country=US"
     __ws_headers = json.dumps({"Origin": "https://data.tradingview.com"})
-    __signin_headers = {'Referer': 'https://www.tradingview.com'}
+    __signin_headers = {"Referer": "https://www.tradingview.com"}
     __ws_timeout = 5
 
     def __init__(
@@ -64,19 +64,18 @@ class TvDatafeed:
 
     def __auth(self, username, password):
 
-        if (username is None or password is None):
+        if username is None or password is None:
             token = None
 
         else:
-            data = {"username": username,
-                    "password": password,
-                    "remember": "on"}
+            data = {"username": username, "password": password, "remember": "on"}
             try:
                 response = requests.post(
-                    url=self.__sign_in_url, data=data, headers=self.__signin_headers)
-                token = response.json()['user']['auth_token']
+                    url=self.__sign_in_url, data=data, headers=self.__signin_headers
+                )
+                token = response.json()["user"]["auth_token"]
             except Exception as e:
-                logger.error('error while signin')
+                logger.error("error while signin")
                 token = None
 
         return token
@@ -84,7 +83,9 @@ class TvDatafeed:
     def __create_connection(self):
         logging.debug("creating websocket connection")
         self.ws = create_connection(
-            "wss://data.tradingview.com/socket.io/websocket", headers=self.__ws_headers, timeout=self.__ws_timeout
+            "wss://data.tradingview.com/socket.io/websocket",
+            headers=self.__ws_headers,
+            timeout=self.__ws_timeout,
         )
 
     @staticmethod
@@ -101,16 +102,14 @@ class TvDatafeed:
     def __generate_session():
         stringLength = 12
         letters = string.ascii_lowercase
-        random_string = "".join(random.choice(letters)
-                                for i in range(stringLength))
+        random_string = "".join(random.choice(letters) for i in range(stringLength))
         return "qs_" + random_string
 
     @staticmethod
     def __generate_chart_session():
         stringLength = 12
         letters = string.ascii_lowercase
-        random_string = "".join(random.choice(letters)
-                                for i in range(stringLength))
+        random_string = "".join(random.choice(letters) for i in range(stringLength))
         return "cs_" + random_string
 
     @staticmethod
@@ -156,13 +155,12 @@ class TvDatafeed:
                     except ValueError:
                         volume_data = False
                         row.append(0.0)
-                        logger.debug('no volume data')
+                        logger.debug("no volume data")
 
                 data.append(row)
 
             data = pd.DataFrame(
-                data, columns=["datetime", "open",
-                               "high", "low", "close", "volume"]
+                data, columns=["datetime", "open", "high", "low", "close", "volume"]
             ).set_index("datetime")
             data.insert(0, "symbol", value=symbol)
             return data
@@ -249,8 +247,7 @@ class TvDatafeed:
         )
 
         self.__send_message(
-            "quote_add_symbols", [self.session, symbol,
-                                  {"flags": ["force_permission"]}]
+            "quote_add_symbols", [self.session, symbol, {"flags": ["force_permission"]}]
         )
         self.__send_message("quote_fast_symbols", [self.session, symbol])
 
@@ -270,8 +267,7 @@ class TvDatafeed:
             "create_series",
             [self.chart_session, "s1", "s1", "symbol_1", interval, n_bars],
         )
-        self.__send_message("switch_timezone", [
-                            self.chart_session, "exchange"])
+        self.__send_message("switch_timezone", [self.chart_session, "exchange"])
 
         raw_data = ""
 
@@ -289,15 +285,32 @@ class TvDatafeed:
 
         return self.__create_df(raw_data, symbol)
 
-    def search_symbol(self, text: str, exchange: str = ''):
+    def search_symbol(self, text: str, exchange: str = ""):
         url = self.__search_url.format(text, exchange)
 
         symbols_list = []
         try:
-            resp = requests.get(url)
+            headers = {
+                "Authorization": f"Bearer {self.token}",
+                "Host": "symbol-search.tradingview.com",
+                "User-Agent": "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:133.0) Gecko/20100101 Firefox/133.0",
+                "Accept": "*/*",
+                "Accept-Language": "en-US,en;q=0.5",
+                "Accept-Encoding": "gzip, deflate, br, zstd",
+                "Referer": "https://www.tradingview.com/",
+                "Origin": "https://www.tradingview.com",
+                "Connection": "keep-alive",
+                "Sec-Fetch-Dest": "empty",
+                "Sec-Fetch-Mode": "cors",
+                "Sec-Fetch-Site": "same-site",
+                "Priority": "u=4",
+                "TE": "trailers",
+            }
+            resp = requests.get(url, headers=headers)
 
-            symbols_list = json.loads(resp.text.replace(
-                '</em>', '').replace('<em>', ''))
+            symbols_list = json.loads(
+                resp.text.replace("</em>", "").replace("<em>", "")
+            )
         except Exception as e:
             logger.error(e)
 
