@@ -183,6 +183,24 @@ class TvDatafeed:
 
         return symbol
 
+    @staticmethod
+    def __parse_m_format(input_string):
+        pattern = r"~m~(\d+)~m~"
+        segments = re.split(pattern, input_string)
+        result = []
+
+        i = 1  # Start from the first number-length indicator
+        while i < len(segments):
+            try:
+                length = int(segments[i])
+                payload = segments[i + 1][:length]
+                result.append(json.loads(payload))
+            except (ValueError, json.JSONDecodeError) as e:
+                print(f"Error processing segment: {segments[i + 1]}")
+            i += 2  # Move to the next number-length indicator
+
+        return result
+
     def get_hist(
         self,
         symbol: str,
@@ -284,6 +302,66 @@ class TvDatafeed:
                 break
 
         return self.__create_df(raw_data, symbol)
+
+    def get_symbol_data(
+        self,
+        symbol: str,
+        exchange: str = "NSE",
+        fut_contract: int = None,
+        extended_session: bool = False,
+    ) -> dict:
+        """get symbol data
+
+        Args:
+            symbol (str): symbol name
+            exchange (str, optional): exchange, not required if symbol is in format EXCHANGE:SYMBOL. Defaults to None.
+            fut_contract (int, optional): None for cash, 1 for continuous current contract in front, 2 for continuous next contract in front . Defaults to None.
+            extended_session (bool, optional): regular session if False, extended session if True, Defaults to False.
+
+        Returns:
+            dict
+        """
+        symbol = self.__format_symbol(
+            symbol=symbol, exchange=exchange, contract=fut_contract
+        )
+
+        self.__create_connection()
+
+        self.__send_message("set_auth_token", [self.token])
+        self.__send_message("chart_create_session", [self.chart_session, ""])
+
+        self.__send_message(
+            "resolve_symbol",
+            [
+                self.chart_session,
+                "symbol_1",
+                '={"symbol":"'
+                + symbol
+                + '","adjustment":"splits","session":'
+                + ('"regular"' if not extended_session else '"extended"')
+                + "}",
+            ],
+        )
+        logger.debug(f"getting data for {symbol}...")
+        while True:
+            try:
+                result = self.ws.recv()
+                if "symbol_resolved" in result:
+                    input = result.replace('\\\\"', "")
+                    parsed_data = self.__parse_m_format(input)
+
+                    for json_entry in parsed_data:
+                        if "m" in json_entry:
+                            if json_entry["m"] == "symbol_resolved":
+                                return json_entry["p"][2]
+            except Exception as e:
+                logger.error(e)
+                break
+
+            if "series_completed" in result:
+                break
+
+        return None
 
     def search_symbol(self, text: str, exchange: str = ""):
         url = self.__search_url.format(text, exchange)
