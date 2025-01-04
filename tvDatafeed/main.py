@@ -24,6 +24,7 @@ quote_fast_symbols_msg = "quote_fast_symbols"
 create_series_msg = "create_series"
 symbol_resolved = "symbol_resolved"
 series_completed = "series_completed"
+price_cash_flow_current = "price_cash_flow_current"
 
 fields = [
     "ch",
@@ -361,35 +362,55 @@ class TvDatafeed:
     def get_symbol_data(
         self,
         symbol: str,
-        exchange: str = "NSE",
-        fut_contract: int = None,
-        extended_session: bool = False,
+        exchange: str,
     ) -> dict:
         """get symbol data
 
         Args:
             symbol (str): symbol name
             exchange (str, optional): exchange, not required if symbol is in format EXCHANGE:SYMBOL. Defaults to None.
-            fut_contract (int, optional): None for cash, 1 for continuous current contract in front, 2 for continuous next contract in front . Defaults to None.
-            extended_session (bool, optional): regular session if False, extended session if True, Defaults to False.
 
         Returns:
             dict
         """
-        symbol = self.format_symbol(
-            symbol=symbol, exchange=exchange, contract=fut_contract
-        )
+        symbol = self.format_symbol(symbol=symbol, exchange=exchange)
 
         self.create_connection()
         self.send_set_auth_token()
         self.send_chart_create_session_msg()
-        self.send_resolve_symbol_msg(symbol, extended_session)
+        self.send_resolve_symbol_msg(symbol)
 
         logger.debug(f"getting data for {symbol}...")
 
         raw_data = self.receive_data(sentinel=symbol_resolved)
 
         return self.parse_symbol_data(raw_data)
+
+    def get_ratios(
+        self,
+        symbol: str,
+        exchange: str,
+    ) -> dict:
+        """get financial ratios
+
+        Args:
+            symbol (str): symbol name
+            exchange (str, optional): exchange, not required if symbol is in format EXCHANGE:SYMBOL. Defaults to None.
+
+        Returns:
+            dict
+        """
+        symbol = self.format_symbol(symbol=symbol, exchange=exchange)
+
+        self.send_set_auth_token()
+        self.send_quote_create_session_msg()
+        self.send_message(
+            "quote_add_symbols",
+            [tv.session, symbol],
+        )
+        raw_data = self.receive_data(sentinel=price_cash_flow_current)
+
+        return raw_data
 
     def search_symbol(self, text: str, exchange: str = ""):
         url = self.search_url.format(text, exchange)
@@ -422,19 +443,6 @@ class TvDatafeed:
 
         return symbols_list
 
-    def get_symbol_ratios(self, text: str, exchange: str = ""):
-        # ~m~36~m~{"m":"set_data_quality","p":["low"]}
-        # ~m~54~m~{"m":"set_auth_token","p":["unauthorized_user_token"]}
-        # ~m~34~m~{"m":"set_locale","p":["en","US"]}
-        # ~m~52~m~{"m":"quote_create_session","p":["qs_7tsehQTQnh0k"]}
-        # ~m~60~m~{"m":"quote_add_symbols","p":["qs_7tsehQTQnh0k","LSE:GENL"]}
-        # ~m~61~m~{"m":"quote_fast_symbols","p":["qs_7tsehQTQnh0k","LSE:GENL"]}
-        # ~m~52~m~{"m":"quote_create_session","p":["qs_EQpcT7Ixjgiu"]}
-        # ~m~473~m~{"m":"quote_set_fields","p":["qs_EQpcT7Ixjgiu","base-currency-logoid","ch","chp","currency-logoid","currency_code","currency_id","base_currency_id","current_session","description","exchange","format","fractional","is_tradable","language","local_description","listed_exchange","logoid","lp","lp_time","minmov","minmove2","original_name","pricescale","pro_name","short_name","type","typespecs","update_mode","volume","variable_tick_size","value_unit_id","unit_id","measure"]}
-        # ~m~60~m~{"m":"quote_add_symbols","p":["qs_EQpcT7Ixjgiu","LSE:GENL"]}
-        # ~m~61~m~{"m":"quote_fast_symbols","p":["qs_EQpcT7Ixjgiu","LSE:GENL"]}
-        pass
-
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
@@ -454,3 +462,6 @@ if __name__ == "__main__":
     print(tv.get_hist("GAZP", "MOEX"))
     sym_data = tv.get_symbol_data("GAZP", "MOEX")
     print(json.dumps(sym_data, indent=4))
+
+    ratio_data = tv.get_ratios("GAZP", "MOEX")
+    print(ratio_data)
