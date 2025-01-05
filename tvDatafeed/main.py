@@ -376,6 +376,7 @@ class TvDatafeed:
         symbol = self.format_symbol(symbol=symbol, exchange=exchange)
 
         self.create_connection()
+
         self.send_set_auth_token()
         self.send_chart_create_session_msg()
         self.send_resolve_symbol_msg(symbol)
@@ -402,11 +403,13 @@ class TvDatafeed:
         """
         symbol = self.format_symbol(symbol=symbol, exchange=exchange)
 
+        self.create_connection()
+
         self.send_set_auth_token()
         self.send_quote_create_session_msg()
         self.send_message(
             "quote_add_symbols",
-            [tv.session, symbol],
+            [self.session, symbol],
         )
         raw_data = self.receive_data(sentinel=price_cash_flow_current)
 
