@@ -19,4 +19,5 @@ ENV/
 env.bak/
 venv.bak/
 tvDatafeed/symbols.pkl
-tvDatafeed/beta.py
+tvDatafeed/beta.py*.json
+*.json

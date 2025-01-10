@@ -108,7 +108,8 @@ class TvDatafeed:
             token = None
 
         else:
-            data = {"username": username, "password": password, "remember": "on"}
+            data = {"username": username,
+                    "password": password, "remember": "on"}
             try:
                 response = requests.post(
                     url=self.sign_in_url, data=data, headers=self.signin_headers
@@ -142,14 +143,16 @@ class TvDatafeed:
     def generate_session():
         stringLength = 12
         letters = string.ascii_lowercase
-        random_string = "".join(random.choice(letters) for i in range(stringLength))
+        random_string = "".join(random.choice(letters)
+                                for i in range(stringLength))
         return "qs_" + random_string
 
     @staticmethod
     def generate_chart_session():
         stringLength = 12
         letters = string.ascii_lowercase
-        random_string = "".join(random.choice(letters) for i in range(stringLength))
+        random_string = "".join(random.choice(letters)
+                                for i in range(stringLength))
         return "cs_" + random_string
 
     @staticmethod
@@ -200,7 +203,8 @@ class TvDatafeed:
                 data.append(row)
 
             data = pd.DataFrame(
-                data, columns=["datetime", "open", "high", "low", "close", "volume"]
+                data, columns=["datetime", "open",
+                               "high", "low", "close", "volume"]
             ).set_index("datetime")
             data.insert(0, "symbol", value=symbol)
             return data
@@ -299,7 +303,8 @@ class TvDatafeed:
         )
 
     def send_switch_timezone_msg(self):
-        self.send_message(switch_timezone_msg, [self.chart_session, "exchange"])
+        self.send_message(switch_timezone_msg, [
+                          self.chart_session, "exchange"])
 
     def receive_data(self, sentinel):
         raw_data = ""
@@ -387,7 +392,7 @@ class TvDatafeed:
 
         return self.parse_symbol_data(raw_data)
 
-    def get_ratios(
+    def get_financial_data(
         self,
         symbol: str,
         exchange: str,
@@ -411,7 +416,12 @@ class TvDatafeed:
             "quote_add_symbols",
             [self.session, symbol],
         )
-        raw_data = self.receive_data(sentinel=price_cash_flow_current)
+        self.send_quote_fast_symbols_msg(symbol)
+        # self.send_quote_create_session_msg()
+        # self.send_quote_set_fields_overview_msg()
+        # self.send_quote_add_symbols_msg(symbol)
+
+        raw_data = self.receive_data(sentinel="complete")
 
         return raw_data
 
