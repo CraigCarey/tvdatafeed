@@ -108,8 +108,7 @@ class TvDatafeed:
             token = None
 
         else:
-            data = {"username": username,
-                    "password": password, "remember": "on"}
+            data = {"username": username, "password": password, "remember": "on"}
             try:
                 response = requests.post(
                     url=self.sign_in_url, data=data, headers=self.signin_headers
@@ -143,16 +142,14 @@ class TvDatafeed:
     def generate_session():
         stringLength = 12
         letters = string.ascii_lowercase
-        random_string = "".join(random.choice(letters)
-                                for i in range(stringLength))
+        random_string = "".join(random.choice(letters) for i in range(stringLength))
         return "qs_" + random_string
 
     @staticmethod
     def generate_chart_session():
         stringLength = 12
         letters = string.ascii_lowercase
-        random_string = "".join(random.choice(letters)
-                                for i in range(stringLength))
+        random_string = "".join(random.choice(letters) for i in range(stringLength))
         return "cs_" + random_string
 
     @staticmethod
@@ -203,8 +200,7 @@ class TvDatafeed:
                 data.append(row)
 
             data = pd.DataFrame(
-                data, columns=["datetime", "open",
-                               "high", "low", "close", "volume"]
+                data, columns=["datetime", "open", "high", "low", "close", "volume"]
             ).set_index("datetime")
             data.insert(0, "symbol", value=symbol)
             return data
@@ -260,6 +256,31 @@ class TvDatafeed:
 
         return result
 
+    def raw_data_to_json_section(self, raw_data):
+        results = raw_data.split("\n")
+        sections = []
+        for result in results:
+            parsed = self.parse_m_format(result)
+            sections.append(parsed)
+
+        return sections
+
+    @staticmethod
+    def flatten_list_of_dicts(nested_list):
+        flattened = []
+        for item in nested_list:
+            if isinstance(item, list):
+                flattened.extend(TvDatafeed.flatten_list_of_dicts(item))
+            elif isinstance(item, dict):
+                if "v" in item:
+                    flattened.append(item["v"])
+                if "p" in item:
+                    if "v" in item["p"][1]:
+                        flattened.append(item["p"][1]["v"])
+            else:
+                flattened.append(item)
+        return flattened
+
     def send_set_auth_token(self):
         self.send_message(set_auth_token_msg, [self.token])
 
@@ -303,8 +324,7 @@ class TvDatafeed:
         )
 
     def send_switch_timezone_msg(self):
-        self.send_message(switch_timezone_msg, [
-                          self.chart_session, "exchange"])
+        self.send_message(switch_timezone_msg, [self.chart_session, "exchange"])
 
     def receive_data(self, sentinel):
         raw_data = ""
@@ -416,14 +436,18 @@ class TvDatafeed:
             "quote_add_symbols",
             [self.session, symbol],
         )
-        self.send_quote_fast_symbols_msg(symbol)
-        # self.send_quote_create_session_msg()
-        # self.send_quote_set_fields_overview_msg()
-        # self.send_quote_add_symbols_msg(symbol)
 
-        raw_data = self.receive_data(sentinel="complete")
+        raw_data = self.receive_data(sentinel="quote_completed")
 
-        return raw_data
+        sections = self.raw_data_to_json_section(raw_data)
+
+        flattened_sections = TvDatafeed.flatten_list_of_dicts(sections)
+
+        flattened_dict = {
+            key: value for d in flattened_sections for key, value in d.items()
+        }
+
+        return flattened_dict
 
     def search_symbol(self, text: str, exchange: str = ""):
         url = self.search_url.format(text, exchange)
@@ -474,7 +498,9 @@ if __name__ == "__main__":
 
     print(tv.get_hist("GAZP", "MOEX"))
     sym_data = tv.get_symbol_data("GAZP", "MOEX")
-    print(json.dumps(sym_data, indent=4))
+    with open("gazp_symbol_data.json", "w") as file:
+        file.write(json.dumps(sym_data, indent=4))
 
-    ratio_data = tv.get_ratios("GAZP", "MOEX")
-    print(ratio_data)
+    financial_data = tv.get_financial_data("GAZP", "MOEX")
+    with open("gazp_financials.json", "w") as file:
+        file.write(json.dumps(financial_data, indent=4))
