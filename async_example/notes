@@ -1,0 +1,13 @@
+get page of symbols from search endpoint
+
+create ws connection
+
+send set auth token message
+
+send quote create session message
+
+create 2 coroutines
+
+send coroutine iterates over page of symbols, sending quote add symbols message for each one (can this be batched?)
+
+receive coroutine waits for messages with 10s timeout 
